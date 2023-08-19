@@ -55,3 +55,6 @@ dmypy.json
 
 # vscode
 .vscode
+
+# qdrant db
+qdrant_storage
