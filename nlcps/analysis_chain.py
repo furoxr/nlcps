@@ -63,7 +63,7 @@ class AnalysisChain:
         )
         parser = PydanticOutputParser(pydantic_object=AnalysisResult)
         self.prompt_template = final_prompt.partial(
-            entities_len=len(entities),
+            entities_len=len(entities), # type: ignore
             entities=",".join(entities),
             context_rules="\n".join(context_rules),
             format_instructions=parser.get_format_instructions(),
@@ -85,7 +85,7 @@ class AnalysisChain:
             List[Dict[str, str]]: Formated examples required by the prompt template.
         """
         return [
-            {"input": e.utterance, "output": e.analysis_result.model_dump_json()}
+            {"input": e.utterance, "output": e.analysis_result.model_dump_json()} # type: ignore
             for e in examples
         ]
 

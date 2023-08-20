@@ -1,6 +1,6 @@
 from typing import List, Optional, NewType
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic.v1 import BaseModel, Field, validator
 
 
 Entity = NewType("Entity", str)
@@ -17,7 +17,7 @@ class AnalysisResult(BaseModel):
         description="Whether context is needed to fulfill the task described in the utterance"
     )
 
-    @field_validator("entities")
+    @validator("entities")
     def entities_validator(cls, v):
         if len(v) == 0:
             raise ValueError("Entities cannot be empty")
@@ -34,3 +34,13 @@ class RelatedSample(BaseModel):
     entities: List[Entity] = Field(description="Entities in the sample")
     code: str = Field(description="DSL code")
     context: Optional[str] = Field(description="Context of the sample")
+
+class NLCPSConfig(BaseModel):
+    analysis_prompt_template: str = Field()
+    entities: List[Entity] = Field()
+    context_rules: List[str] = Field()
+    few_shot_examples: List[AnalysisExample] = Field()
+
+    retrieve_k: int = Field()
+    retrieve_prompt_template: str = Field()
+    
