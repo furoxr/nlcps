@@ -7,7 +7,7 @@ from langchain.prompts import (
     FewShotChatMessagePromptTemplate,
 )
 from langchain.chat_models import ChatOpenAI
-from pydantic import BaseModel
+from pydantic.v1 import BaseModel
 from qdrant_client.models import Filter, FieldCondition, MatchValue, MatchAny
 from nlcps.selector import FilterExampleSelector
 from nlcps.types import (
@@ -35,7 +35,7 @@ class RetrieveChain(BaseModel):
     dsl_rules_selector: FilterExampleSelector[DSLRuleExample]
     dsl_examples_selector: FilterExampleSelector[RetrieveExample]
 
-    prompt_template: Any = None
+    _prompt_template: Any = None
 
     def format_dsl_syntax(
         self,
@@ -46,7 +46,7 @@ class RetrieveChain(BaseModel):
         dsl_syntax_examples = self.dsl_syntax_selector.select(
             Filter(must=[FieldCondition(key=key, match=MatchAny(any=entities))])
         )
-        self.prompt_template = self.prompt_template.partial(
+        self._prompt_template = self._prompt_template.partial(
             dsl_syntax="\n".join(["- " + i.code for i in dsl_syntax_examples])
         )
 
@@ -59,7 +59,7 @@ class RetrieveChain(BaseModel):
         dsl_rules_examples = self.dsl_rules_selector.select(
             Filter(must=[FieldCondition(key=key, match=MatchAny(any=entities))])
         )
-        self.prompt_template = self.prompt_template.partial(
+        self._prompt_template = self._prompt_template.partial(
             dsl_rules="\n".join(["- " + i.rule for i in dsl_rules_examples])
         )
 
@@ -110,26 +110,26 @@ class RetrieveChain(BaseModel):
         self, user_utterance: str, entities: List[str], context: Optional[str] = None
     ):
         few_shot_prompt = self.few_shot_exmaple_template(user_utterance, entities)
-        self.prompt_template = ChatPromptTemplate.from_messages(
+        self._prompt_template = ChatPromptTemplate.from_messages(
             [
                 SystemMessagePromptTemplate.from_template(RETRIEVE_PROMPT),
                 few_shot_prompt,
                 HumanMessagePromptTemplate.from_template("{input}\n{context}"),
             ]
         )
-        self.prompt_template = self.prompt_template.partial(
+        self._prompt_template = self._prompt_template.partial(
             system_instruction=self.system_instruction
         )
         self.format_dsl_syntax(entities)
         self.format_dsl_rules(entities)
         if context:
-            self.prompt_template = self.prompt_template.partial(
+            self._prompt_template = self._prompt_template.partial(
                 context=f"Context is:\n{context}"
             )
 
         self.chain = LLMChain(
             llm=self.llm,
-            prompt=self.prompt_template,
+            prompt=self._prompt_template,
         )
 
     def run(
