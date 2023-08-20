@@ -9,7 +9,7 @@ from langchain.prompts import (
 from langchain.chat_models import ChatOpenAI
 from langchain.output_parsers import PydanticOutputParser
 
-from nlcps.types import AnalysisExample, AnalysisResult, Entity
+from nlcps.types import AnalysisExample, AnalysisResult
 
 from typing import Dict, List
 
@@ -31,7 +31,7 @@ class AnalysisChain:
     def __init__(
         self,
         llm: ChatOpenAI,
-        entities: List[Entity],
+        entities: List[str],
         context_rules: List[str],
         examples: List[AnalysisExample],
     ) -> None:
@@ -41,7 +41,7 @@ class AnalysisChain:
 
         Args:
             llm (ChatOpenAI): Interface with openai
-            entities (List[Entity]): All entities DSL supported
+            entities (List[str]): All entities DSL supported
             context_rules (List[str]): Rules inster into prompt, helping AI decide whether context is needed
             examples (List[AnalysisExample]): Few-shot prompt examples
         """
