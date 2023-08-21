@@ -1,14 +1,17 @@
+from typing import Any, List, Optional
+
 from langchain import LLMChain
-from langchain.prompts import (
-    ChatPromptTemplate,
-    SystemMessagePromptTemplate,
-    HumanMessagePromptTemplate,
-    AIMessagePromptTemplate,
-    FewShotChatMessagePromptTemplate,
-)
 from langchain.chat_models import ChatOpenAI
+from langchain.prompts import (
+    AIMessagePromptTemplate,
+    ChatPromptTemplate,
+    FewShotChatMessagePromptTemplate,
+    HumanMessagePromptTemplate,
+    SystemMessagePromptTemplate,
+)
 from pydantic.v1 import BaseModel
-from qdrant_client.models import Filter, FieldCondition, MatchValue, MatchAny
+from qdrant_client.models import FieldCondition, Filter, MatchAny, MatchValue
+
 from nlcps.selector import FilterExampleSelector
 from nlcps.types import (
     AnalysisResult,
@@ -16,9 +19,6 @@ from nlcps.types import (
     DSLSyntaxExample,
     RetrieveExample,
 )
-
-from typing import Any, List, Optional
-
 
 RETRIEVE_PROMPT = (
     "{system_instruction}\n"
@@ -63,12 +63,9 @@ class RetrieveChain(BaseModel):
             dsl_rules="\n".join(["- " + i.rule for i in dsl_rules_examples])
         )
 
-    def few_shot_exmaple_template(
-        self,
-        user_utterance: str,
-        entities: List[str],
-    ) -> FewShotChatMessagePromptTemplate:
-        """Get all examples of this DSL related to user utterance"""
+    def retrieve_few_shot_examples(
+        self, user_utterance: str, entities: List[str]
+    ) -> List[tuple[RetrieveExample, float]]:
         key = f"{self.dsl_examples_selector.qdrant.metadata_payload_key}.entities"
         condition = Filter(
             must=[
@@ -81,8 +78,18 @@ class RetrieveChain(BaseModel):
         )
         similarity_examples.sort(key=lambda x: x[1])
         similarity_examples.reverse()
+        return similarity_examples
 
+    def few_shot_exmaple_template(
+        self,
+        user_utterance: str,
+        entities: List[str],
+    ) -> FewShotChatMessagePromptTemplate:
+        """Get all examples of this DSL related to user utterance"""
+        similarity_examples = self.retrieve_few_shot_examples(user_utterance, entities)
         final_examples = []
+
+        # Select max(k, length(entities)) samples, such that each associated entities is represented at least once
         for index in range(max([self.dsl_examples_selector.k, len(entities)])):
             example = similarity_examples[index][0]
             final_examples.append(
