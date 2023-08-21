@@ -67,6 +67,7 @@ class RetrieveChain(BaseModel):
     def retrieve_few_shot_examples(
         self, user_utterance: str, entities: List[str]
     ) -> List[tuple[RetrieveExample, float]]:
+        """Retrieve related samples from sample bank."""
         key = f"{self.dsl_examples_selector.qdrant.metadata_payload_key}.entities"
         condition = Filter(
             must=[
@@ -86,7 +87,7 @@ class RetrieveChain(BaseModel):
         user_utterance: str,
         entities: List[str],
     ) -> FewShotChatMessagePromptTemplate:
-        """Get all examples of this DSL related to user utterance"""
+        """Format template leveraging examples"""
         similarity_examples = self.retrieve_few_shot_examples(user_utterance, entities)
         final_examples = []
 
@@ -117,6 +118,7 @@ class RetrieveChain(BaseModel):
     def init_chain(
         self, user_utterance: str, entities: List[str], context: Optional[str] = None
     ):
+        """Format template with rules, syntax and examples"""
         few_shot_prompt = self.few_shot_exmaple_template(user_utterance, entities)
         self._prompt_template = ChatPromptTemplate.from_messages(
             [

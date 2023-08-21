@@ -99,6 +99,7 @@ class NlcpsExecutor:
         )
 
     def init_vectorstore(self):
+        """Create collections if not exists."""
         collections = [
             self.config.dsl_syntax_collection_name,
             self.config.dsl_rules_collection_name,

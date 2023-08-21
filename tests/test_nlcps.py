@@ -1,10 +1,9 @@
 import os
 
 import pytest
-from langchain.chat_models import ChatOpenAI
 from qdrant_client.models import Distance, VectorParams
 
-from nlcps.analysis_chain import AnalysisChain, AnalysisExample, AnalysisResult
+from nlcps.analysis_chain import AnalysisExample, AnalysisResult
 from nlcps.executor import NlcpsConfig, NlcpsExecutor
 from nlcps.types import DSLRuleExample, DSLSyntaxExample, RetrieveExample
 
@@ -95,7 +94,6 @@ def executor(analysis_examples, dsl_chat_exampes, dsl_rules_exampes, dsl_syntax_
         )
 
     # Add DSL syntax, rules, examples into vectorstore
-    
     [executor.retrieve_chain.dsl_syntax_selector.add(e) for e in dsl_syntax_exampes]
     [executor.retrieve_chain.dsl_rules_selector.add(e) for e in dsl_rules_exampes]
     [executor.retrieve_chain.dsl_examples_selector.add(e) for e in dsl_chat_exampes]

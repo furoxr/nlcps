@@ -22,7 +22,7 @@ class FilterExampleSelector(BaseModel, Generic[T]):
         arbitrary_types_allowed = True
 
     def add(self, item: T) -> str:
-        """Add new example to qdrant."""
+        """Add new point to collection."""
         data = item.dict()
         if "id" in data:
             data.pop("id")
@@ -39,6 +39,7 @@ class FilterExampleSelector(BaseModel, Generic[T]):
     def similarity_select(
         self, input_variables: Dict[str, str], filter: Optional[Filter] = None
     ) -> List[tuple[T, float]]:
+        """Select points with semantic similarity."""
         if self.input_keys:
             input_variables = {key: input_variables[key] for key in self.input_keys}
         query = " ".join(sorted_values(input_variables))
@@ -61,6 +62,7 @@ class FilterExampleSelector(BaseModel, Generic[T]):
         return examples
 
     def select(self, filter: Optional[Filter] = None) -> List[T]:
+        """Select points with filter"""
         points = self.qdrant.client.scroll(
             self.qdrant.collection_name,
             filter,
