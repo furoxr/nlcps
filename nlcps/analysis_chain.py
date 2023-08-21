@@ -8,6 +8,7 @@ from langchain.prompts import (
 )
 from langchain.chat_models import ChatOpenAI
 from langchain.output_parsers import PydanticOutputParser
+from pydantic.v1 import BaseModel
 
 from nlcps.types import AnalysisExample, AnalysisResult
 
@@ -27,23 +28,16 @@ ANALYSIS_PROMPT = (
 )
 
 
-class AnalysisChain:
-    def __init__(
-        self,
-        llm: ChatOpenAI,
-        entities: List[str],
-        context_rules: List[str],
-        examples: List[AnalysisExample],
-    ) -> None:
+class AnalysisChain(BaseModel):
+    llm: ChatOpenAI
+    entities: List[str]
+    context_rules: List[str]
+    examples: List[AnalysisExample]
+
+    def init_chain(self) -> None:
         """Initialize an analysis chain.
 
         This chain will analyze user utterance and returns a AnalysisResult.
-
-        Args:
-            llm (ChatOpenAI): Interface with openai
-            entities (List[str]): All entities DSL supported
-            context_rules (List[str]): Rules inster into prompt, helping AI decide whether context is needed
-            examples (List[AnalysisExample]): Few-shot prompt examples
         """
         example_prompt = ChatPromptTemplate.from_messages(
             [
@@ -52,7 +46,7 @@ class AnalysisChain:
             ]
         )
         few_shot_prompt = FewShotChatMessagePromptTemplate(
-            example_prompt=example_prompt, examples=self.format_examples(examples)
+            example_prompt=example_prompt, examples=self.format_examples(self.examples)
         )
         final_prompt = ChatPromptTemplate.from_messages(
             [
@@ -63,14 +57,14 @@ class AnalysisChain:
         )
         parser = PydanticOutputParser(pydantic_object=AnalysisResult)
         self.prompt_template = final_prompt.partial(
-            entities_len=len(entities), # type: ignore
-            entities=",".join(entities),
-            context_rules="\n".join(context_rules),
+            entities_len=len(self.entities),  # type: ignore
+            entities=",".join(self.entities),
+            context_rules="\n".join(self.context_rules),
             format_instructions=parser.get_format_instructions(),
         )
 
         self.chain = LLMChain(
-            llm=llm,
+            llm=self.llm,
             prompt=self.prompt_template,
             output_parser=parser,
         )
@@ -85,9 +79,10 @@ class AnalysisChain:
             List[Dict[str, str]]: Formated examples required by the prompt template.
         """
         return [
-            {"input": e.utterance, "output": e.analysis_result.model_dump_json()} # type: ignore
+            {"input": e.utterance, "output": e.analysis_result.model_dump_json()}  # type: ignore
             for e in examples
         ]
 
     def run(self, user_utterance: str) -> AnalysisResult:
+        self.init_chain()
         return self.chain.run(user_utterance)
