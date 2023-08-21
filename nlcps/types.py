@@ -5,9 +5,7 @@ from pydantic.v1 import BaseModel, Field, validator
 
 
 class AnalysisResult(BaseModel):
-    entities: List[str] = Field(
-        description="Entities including in the user utterance"
-    )
+    entities: List[str] = Field(description="Entities including in the user utterance")
     thoughts: str = Field(
         description="Thoughts is the reasoning steps you made to decide whether context is needed"
     )
@@ -30,11 +28,13 @@ class AnalysisExample(BaseModel):
 class BaseIdModel(BaseModel):
     id: Optional[str] = Field(description="Unique id of the point in qdrant")
 
+
 class RetrieveExample(BaseIdModel):
     user_utterance: str = Field(description="User utterance")
     code: str = Field(description="Generated DSL code")
     context: Optional[str] = Field(description="Context of the example")
     entities: List[str] = Field(description="Entities of the user utterance")
+
 
 class RelatedSample(BaseModel):
     score: Optional[float] = Field(description="Score of the sample")
@@ -42,15 +42,6 @@ class RelatedSample(BaseModel):
     code: str = Field(description="DSL code")
     context: Optional[str] = Field(description="Context of the sample")
 
-class NLCPSConfig(BaseModel):
-    analysis_prompt_template: str = Field()
-    entities: List[str] = Field()
-    context_rules: List[str] = Field()
-    few_shot_examples: List[AnalysisExample] = Field()
-
-    retrieve_k: int = Field()
-    retrieve_prompt_template: str = Field()
-    
 
 class DSLSyntaxExample(BaseIdModel):
     entities: List[str]

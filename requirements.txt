@@ -67,3 +67,4 @@ typing_extensions==4.7.1
 tzdata==2023.3
 urllib3==1.26.16
 yarl==1.9.2
+python-dotenv==1.0.0

@@ -45,8 +45,8 @@ class FilterExampleSelector(BaseModel, Generic[T]):
         example_docs = self.qdrant.client.search(
             self.qdrant.collection_name,
             self.qdrant._embed_query(query),
-            k=self.k,
-            filter=filter,
+            limit=self.k,
+            query_filter=filter,
         )
 
         examples = [

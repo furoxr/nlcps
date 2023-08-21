@@ -9,8 +9,7 @@ from langchain.prompts import (
     HumanMessagePromptTemplate,
     SystemMessagePromptTemplate,
 )
-from pydantic import PrivateAttr
-from pydantic.v1 import BaseModel
+from pydantic.v1 import BaseModel, PrivateAttr
 from qdrant_client.models import FieldCondition, Filter, MatchAny, MatchValue
 
 from nlcps.selector import FilterExampleSelector
@@ -92,7 +91,7 @@ class RetrieveChain(BaseModel):
         final_examples = []
 
         # Select max(k, length(entities)) samples, such that each associated entities is represented at least once
-        for index in range(max([self.dsl_examples_selector.k, len(entities)])):
+        for index in range(min(max(self.dsl_examples_selector.k, len(entities)), len(similarity_examples))):
             example = similarity_examples[index][0]
             final_examples.append(
                 {
