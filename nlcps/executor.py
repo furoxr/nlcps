@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from langchain.chat_models import ChatOpenAI
 from langchain.embeddings import OpenAIEmbeddings
@@ -22,7 +22,7 @@ from nlcps.util import logger
 
 class NlcpsConfig(BaseSettings):
     openai_api_key: str
-    openai_api_base: str
+    openai_api_base: str = "https://api.openai.com/v1"
 
     entities: List[str]
     context_rules: List[str]
@@ -64,6 +64,7 @@ class NlcpsExecutor:
             ),
             model_cls=DSLSyntaxExample,
             k=self.config.dsl_syntax_k,
+            input_keys=["code"]
         )
 
         dsl_rules_selector = FilterExampleSelector(
@@ -72,6 +73,7 @@ class NlcpsExecutor:
             ),
             k=self.config.dsl_rules_k,
             model_cls=DSLRuleExample,
+            input_keys=["rule"]
         )
 
         dsl_examples_selector = FilterExampleSelector(
@@ -125,10 +127,16 @@ class NlcpsExecutor:
     def program_synthesis(
         self,
         user_utterance: str,
-        context: str,
+        context: Optional[str] = None,
     ) -> str:
-        """Retrieve related samples from sample bank."""
+        """Generate DSL program to fulfill user utterance."""
         analysis_result = self.analysis_chain.run(user_utterance)
+        print(analysis_result)
+        if analysis_result.need_context and context is None:
+            raise ValueError(
+                "User utterance requires context but no context is provided."
+            )
+
         return self.retrieve_chain.run(
             user_utterance, analysis_result.entities, context
         )

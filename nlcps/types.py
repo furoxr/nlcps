@@ -1,5 +1,4 @@
-from optparse import Option
-from typing import List, Optional, NewType
+from typing import List, Optional
 
 from pydantic.v1 import BaseModel, Field, validator
 
@@ -34,13 +33,6 @@ class RetrieveExample(BaseIdModel):
     code: str = Field(description="Generated DSL code")
     context: Optional[str] = Field(description="Context of the example")
     entities: List[str] = Field(description="Entities of the user utterance")
-
-
-class RelatedSample(BaseModel):
-    score: Optional[float] = Field(description="Score of the sample")
-    entities: List[str] = Field(description="Entities in the sample")
-    code: str = Field(description="DSL code")
-    context: Optional[str] = Field(description="Context of the sample")
 
 
 class DSLSyntaxExample(BaseIdModel):
