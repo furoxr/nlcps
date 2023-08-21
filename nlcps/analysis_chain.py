@@ -37,10 +37,7 @@ class AnalysisChain(BaseModel):
     _chain: LLMChain = PrivateAttr()
 
     def init_chain(self) -> None:
-        """Initialize an analysis chain.
-
-        This chain will analyze user utterance and returns a AnalysisResult.
-        """
+        """Initialize an analysis chain."""
         example_prompt = ChatPromptTemplate.from_messages(
             [
                 HumanMessagePromptTemplate.from_template("{input}"),
@@ -72,14 +69,7 @@ class AnalysisChain(BaseModel):
         )
 
     def format_examples(self, examples: List[AnalysisExample]) -> List[Dict[str, str]]:
-        """Handle the format of examples
-
-        Args:
-            examples (List[AnalysisExample]): Examples
-
-        Returns:
-            List[Dict[str, str]]: Formated examples required by the prompt template.
-        """
+        """Handle the format of examples"""
         return [
             {"input": e.utterance, "output": e.analysis_result.json()}  # type: ignore
             for e in examples

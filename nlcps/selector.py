@@ -1,10 +1,9 @@
-from langchain.vectorstores.qdrant import Qdrant
-from langchain.prompts.example_selector.semantic_similarity import sorted_values
-from pydantic.v1 import Extra
-from pydantic.v1 import BaseModel
-from qdrant_client.models import Filter
+from typing import Dict, Generic, List, Optional, TypeVar
 
-from typing import Generic, List, Optional, Dict, TypeVar
+from langchain.prompts.example_selector.semantic_similarity import sorted_values
+from langchain.vectorstores.qdrant import Qdrant
+from pydantic.v1 import BaseModel, Extra
+from qdrant_client.models import Filter
 
 from nlcps.types import BaseIdModel
 

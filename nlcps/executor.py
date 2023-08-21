@@ -64,7 +64,7 @@ class NlcpsExecutor:
             ),
             model_cls=DSLSyntaxExample,
             k=self.config.dsl_syntax_k,
-            input_keys=["code"]
+            input_keys=["code"],
         )
 
         dsl_rules_selector = FilterExampleSelector(
@@ -73,7 +73,7 @@ class NlcpsExecutor:
             ),
             k=self.config.dsl_rules_k,
             model_cls=DSLRuleExample,
-            input_keys=["rule"]
+            input_keys=["rule"],
         )
 
         dsl_examples_selector = FilterExampleSelector(

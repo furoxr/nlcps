@@ -14,7 +14,6 @@ from qdrant_client.models import FieldCondition, Filter, MatchAny, MatchValue
 
 from nlcps.selector import FilterExampleSelector
 from nlcps.types import (
-    AnalysisResult,
     DSLRuleExample,
     DSLSyntaxExample,
     RetrieveExample,
