@@ -9,6 +9,7 @@ from langchain.prompts import (
     HumanMessagePromptTemplate,
     SystemMessagePromptTemplate,
 )
+from pydantic import PrivateAttr
 from pydantic.v1 import BaseModel
 from qdrant_client.models import FieldCondition, Filter, MatchAny, MatchValue
 
@@ -35,7 +36,8 @@ class RetrieveChain(BaseModel):
     dsl_rules_selector: FilterExampleSelector[DSLRuleExample]
     dsl_examples_selector: FilterExampleSelector[RetrieveExample]
 
-    _prompt_template: Any = None
+    _prompt_template: ChatPromptTemplate = PrivateAttr()
+    _chain: LLMChain = PrivateAttr()
 
     def format_dsl_syntax(
         self,
@@ -134,7 +136,7 @@ class RetrieveChain(BaseModel):
                 context=f"Context is:\n{context}"
             )
 
-        self.chain = LLMChain(
+        self._chain = LLMChain(
             llm=self.llm,
             prompt=self._prompt_template,
         )
@@ -143,4 +145,4 @@ class RetrieveChain(BaseModel):
         self, user_utterance: str, entities: List[str], context: Optional[str] = None
     ) -> str:
         self.init_chain(user_utterance, entities, context)
-        return self.chain.run(input=user_utterance, context=context)
+        return self._chain.run(input=user_utterance, context=context)
