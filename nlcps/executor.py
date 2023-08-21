@@ -131,7 +131,7 @@ class NlcpsExecutor:
     ) -> str:
         """Generate DSL program to fulfill user utterance."""
         analysis_result = self.analysis_chain.run(user_utterance)
-        print(analysis_result)
+        logger.debug(f"{analysis_result}")
         if analysis_result.need_context and context is None:
             raise ValueError(
                 "User utterance requires context but no context is provided."

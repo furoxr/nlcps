@@ -36,10 +36,8 @@ def dsl_chat_exampes():
 
 
 @pytest.fixture(scope="module")
-def executor(dsl_chat_exampes, dsl_rules_exampes, dsl_syntax_exampes):
-    key = os.getenv("OPENAI_API_KEY")
-    base = os.getenv("OPENAI_BASE")
-    examples = [
+def analysis_examples():
+    return [
         AnalysisExample(
             utterance="Make the title text on this slide red",
             analysis_result=AnalysisResult(
@@ -57,7 +55,12 @@ def executor(dsl_chat_exampes, dsl_rules_exampes, dsl_syntax_exampes):
             ),
         ),
     ]
-    entites = [i for i in ["text", "image", "shape", "slide", "presentation"]]
+
+@pytest.fixture(scope="module")
+def executor(analysis_examples, dsl_chat_exampes, dsl_rules_exampes, dsl_syntax_exampes):
+    key = os.getenv("OPENAI_API_KEY")
+    base = os.getenv("OPENAI_BASE")
+    entites = ["text", "image", "shape", "slide", "presentation"]
     context_rules = [
         "- Adding new text needs context to decide where to place the text on the current slide.",
         "- Adding an image about a given topic does not require context.",
@@ -68,7 +71,7 @@ def executor(dsl_chat_exampes, dsl_rules_exampes, dsl_syntax_exampes):
         openai_api_base=base,
         entities=entites,
         context_rules=context_rules,
-        analysis_examples=examples,
+        analysis_examples=analysis_examples,
         system_instruction="The DSL we are using is for performing actions in PowerPoint, please write DSL code to fulfill the given user utterance.",
         dsl_examples_collection_name="test_dsl_examples",
         dsl_examples_k=5,
@@ -101,10 +104,13 @@ def executor(dsl_chat_exampes, dsl_rules_exampes, dsl_syntax_exampes):
 
 
 def test_executor(executor: NlcpsExecutor):
-    code = executor.program_synthesis("Make the title text on this slide red", "")
-    print(code)
+    code = executor.program_synthesis(user_utterance="Make the title text on this slide red", context="")
+    print(f"code:\n{code}")
 
-    code = executor.program_synthesis("Create a presentation about climate change.", "")
-    print(code)
 
+    code = executor.program_synthesis(user_utterance="Add text that’s a poem about the life of a high school student with emojis", context="")
+    print(f"code:\n{code}")
+
+    code = executor.program_synthesis(user_utterance="Delete all the text on this slide.", context="")
+    print(f"code:\n{code}")
 
