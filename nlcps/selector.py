@@ -2,10 +2,12 @@ from typing import Dict, Generic, List, Optional, TypeVar
 
 from langchain.prompts.example_selector.semantic_similarity import sorted_values
 from langchain.vectorstores.qdrant import Qdrant
+from langchain.embeddings.base import Embeddings
 from pydantic.v1 import BaseModel, Extra
+from qdrant_client import QdrantClient
 from qdrant_client.models import Filter
 
-from nlcps.types import BaseIdModel
+from nlcps.types import BaseIdModel, DSLRuleExample, DSLSyntaxExample, RetrieveExample
 
 T = TypeVar("T", bound=BaseIdModel)
 
@@ -19,9 +21,14 @@ class FilterExampleSelector(BaseModel, Generic[T]):
     class Config:
         extra = Extra.forbid
         arbitrary_types_allowed = True
-
+    
+    @property
+    def collection_name(self) -> str:
+        return self.qdrant.collection_name
+    
     def add(self, item: T) -> str:
         """Add new point to collection."""
+        assert isinstance(item, self.model_cls)
         data = item.dict()
         if "id" in data:
             data.pop("id")
@@ -75,3 +82,36 @@ class FilterExampleSelector(BaseModel, Generic[T]):
         ]
 
         return examples
+
+
+def dsl_syntax_selector_factory(
+    client: QdrantClient, collection_name: str, embeddings: Embeddings, k: int
+) -> FilterExampleSelector[DSLSyntaxExample]:
+    return FilterExampleSelector(
+        qdrant=Qdrant(client, collection_name, embeddings),
+        model_cls=DSLSyntaxExample,
+        k=k,
+        input_keys=["code"],
+    )
+
+
+def dsl_rules_selector_factory(
+    client: QdrantClient, collection_name: str, embeddings: Embeddings, k: int
+) -> FilterExampleSelector[DSLRuleExample]:
+    return FilterExampleSelector(
+        qdrant=Qdrant(client, collection_name, embeddings),
+        model_cls=DSLRuleExample,
+        k=k,
+        input_keys=["rule"],
+    )
+
+
+def dsl_examples_selector_factory(
+    client: QdrantClient, collection_name: str, embeddings: Embeddings, k: int
+) -> FilterExampleSelector[RetrieveExample]:
+    return FilterExampleSelector(
+        qdrant=Qdrant(client, collection_name, embeddings),
+        model_cls=RetrieveExample,
+        k=k,
+        input_keys=["user_utterance"],
+    )

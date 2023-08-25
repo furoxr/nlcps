@@ -47,7 +47,7 @@ You can find usage examples and tests in the `tests/test_nlcps.py` file.
 To run the tests, make sure you have the necessary environment variables set:
 
 ```bash
-OPENAI_API_KEY='your-api-key' OPENAI_BASE='https://api.openai.com/v1' pytest -s tests/
+OPENAI_API_KEY='your-api-key' OPENAI_API_BASE='https://api.openai.com/v1' pytest -s tests/
 ```
 
 Replace `'your-api-key'` with your actual OpenAI API key.

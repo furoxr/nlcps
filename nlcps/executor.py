@@ -10,7 +10,12 @@ from qdrant_client.models import Distance, VectorParams
 
 from nlcps.analysis_chain import AnalysisChain, AnalysisResult
 from nlcps.retrieve_chain import RetrieveChain
-from nlcps.selector import FilterExampleSelector
+from nlcps.selector import (
+    FilterExampleSelector,
+    dsl_examples_selector_factory,
+    dsl_rules_selector_factory,
+    dsl_syntax_selector_factory,
+)
 from nlcps.types import (
     AnalysisExample,
     DSLRuleExample,
@@ -29,13 +34,10 @@ class NlcpsConfig(BaseSettings):
     analysis_examples: List[AnalysisExample]
     system_instruction: str
 
-    dsl_syntax_collection_name: str
+    collection_name_prefix: str
+
     dsl_syntax_k: int = 5
-
-    dsl_rules_collection_name: str
     dsl_rules_k: int = 5
-
-    dsl_examples_collection_name: str
     dsl_examples_k: int = 5
 
     class Config:
@@ -44,66 +46,22 @@ class NlcpsConfig(BaseSettings):
 
 
 class NlcpsExecutor:
-    def __init__(self, config: NlcpsConfig):
-        self.config = config
-
-        self.llm = ChatOpenAI(
-            openai_api_key=self.config.openai_api_key,
-            openai_api_base=self.config.openai_api_base,
-        )
-        self.qdrant_client = QdrantClient()
-
-        embeddings = OpenAIEmbeddings(  # type: ignore
-            openai_api_key=self.config.openai_api_key,
-            openai_api_base=self.config.openai_api_base,
-        )
-
-        dsl_syntax_selector = FilterExampleSelector(
-            qdrant=Qdrant(
-                self.qdrant_client, self.config.dsl_syntax_collection_name, embeddings
-            ),
-            model_cls=DSLSyntaxExample,
-            k=self.config.dsl_syntax_k,
-            input_keys=["code"],
-        )
-
-        dsl_rules_selector = FilterExampleSelector(
-            qdrant=Qdrant(
-                self.qdrant_client, self.config.dsl_rules_collection_name, embeddings
-            ),
-            k=self.config.dsl_rules_k,
-            model_cls=DSLRuleExample,
-            input_keys=["rule"],
-        )
-
-        dsl_examples_selector = FilterExampleSelector(
-            qdrant=Qdrant(
-                self.qdrant_client, self.config.dsl_examples_collection_name, embeddings
-            ),
-            k=self.config.dsl_examples_k,
-            model_cls=RetrieveExample,
-            input_keys=["user_utterance"],
-        )
-        self.analysis_chain = AnalysisChain(
-            llm=self.llm,
-            entities=self.config.entities,
-            context_rules=self.config.context_rules,
-            examples=self.config.analysis_examples,
-        )
-        self.retrieve_chain = RetrieveChain(
-            llm=self.llm,
-            system_instruction=self.config.system_instruction,
-            dsl_syntax_selector=dsl_syntax_selector,
-            dsl_rules_selector=dsl_rules_selector,
-            dsl_examples_selector=dsl_examples_selector,
-        )
+    def __init__(
+        self,
+        qdrant_client: QdrantClient,
+        analysis_chain: AnalysisChain,
+        retrieve_chain: RetrieveChain,
+    ):
+        self.qdrant_client = qdrant_client
+        self.analysis_chain = analysis_chain
+        self.retrieve_chain = retrieve_chain
 
     def init_vectorstore(self):
         """Create collections if not exists."""
         collections = [
-            self.config.dsl_syntax_collection_name,
-            self.config.dsl_rules_collection_name,
-            self.config.dsl_examples_collection_name,
+            self.retrieve_chain.dsl_rules_selector.collection_name,
+            self.retrieve_chain.dsl_examples_selector.collection_name,
+            self.retrieve_chain.dsl_syntax_selector.collection_name,
         ]
         for collection_name in collections:
             try:
@@ -141,3 +99,49 @@ class NlcpsExecutor:
         return self.retrieve_chain.run(
             user_utterance, analysis_result.entities, context
         )
+
+
+def nlcps_executor_factory(config: NlcpsConfig) -> NlcpsExecutor:
+    dsl_syntax_collection_name = f"{config.collection_name_prefix}_dsl_syntax"
+    dsl_rules_collection_name = f"{config.collection_name_prefix}_dsl_rules"
+    dsl_examples_collection_name = f"{config.collection_name_prefix}_dsl_examples"
+
+    llm = ChatOpenAI(
+        openai_api_key=config.openai_api_key,
+        openai_api_base=config.openai_api_base,
+    )
+    qdrant_client = QdrantClient()
+
+    embeddings = OpenAIEmbeddings(  # type: ignore
+        openai_api_key=config.openai_api_key,
+        openai_api_base=config.openai_api_base,
+    )
+
+    dsl_syntax_selector = dsl_syntax_selector_factory(
+        qdrant_client, dsl_syntax_collection_name, embeddings, config.dsl_syntax_k
+    )
+    dsl_rules_selector = dsl_rules_selector_factory(
+        qdrant_client, dsl_rules_collection_name, embeddings, config.dsl_rules_k
+    )
+    dsl_examples_selector = dsl_examples_selector_factory(
+        qdrant_client, dsl_examples_collection_name, embeddings, config.dsl_examples_k
+    )
+
+    analysis_chain = AnalysisChain(
+        llm=llm,
+        entities=config.entities,
+        context_rules=config.context_rules,
+        examples=config.analysis_examples,
+    )
+    retrieve_chain = RetrieveChain(
+        llm=llm,
+        system_instruction=config.system_instruction,
+        dsl_syntax_selector=dsl_syntax_selector,
+        dsl_rules_selector=dsl_rules_selector,
+        dsl_examples_selector=dsl_examples_selector,
+    )
+    return NlcpsExecutor(
+        qdrant_client=qdrant_client,
+        analysis_chain=analysis_chain,
+        retrieve_chain=retrieve_chain,
+    )

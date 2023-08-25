@@ -4,33 +4,65 @@ import pytest
 from qdrant_client.models import Distance, VectorParams
 
 from nlcps.analysis_chain import AnalysisExample, AnalysisResult
-from nlcps.executor import NlcpsConfig, NlcpsExecutor
+from nlcps.executor import NlcpsConfig, NlcpsExecutor, nlcps_executor_factory
 from nlcps.types import DSLRuleExample, DSLSyntaxExample, RetrieveExample
 
 
 @pytest.fixture(scope="module")
 def dsl_syntax_exampes():
     return [
-        DSLSyntaxExample(entities=["text"], code='# Get the title from all slides in the presentation\ntextRanges = select_text(scope="Presentation", name="Title")'),
-        DSLSyntaxExample(entities=["text"], code='# Gets the textRanges matching the string "Hello" from the provided shapes.\ntextRanges = select_text(scope=shapes, text="Hello")'),
-        DSLSyntaxExample(entities=["text"], code='# Formats the text in textRanges to be bold, italic, have Times New Roman font, have a single underline, have font size 24, have the color teal and be Left aligned.\nformat_text(textRanges=textRanges, bold=true, fontName="Times New Roman", horizontalAlignment="Left", size=24, color="teal", italic=true, underline="Single")'),
-        DSLSyntaxExample(entities=["text"], code='# Many of the argument to format statements are optional. For example, this format statement makes the text bulleted and changes its color to olive.\nformat_text(textRanges=textRanges, bulleted=true, color="#808000")'),
+        DSLSyntaxExample(
+            entities=["text"],
+            code='# Get the title from all slides in the presentation\ntextRanges = select_text(scope="Presentation", name="Title")',
+        ),
+        DSLSyntaxExample(
+            entities=["text"],
+            code='# Gets the textRanges matching the string "Hello" from the provided shapes.\ntextRanges = select_text(scope=shapes, text="Hello")',
+        ),
+        DSLSyntaxExample(
+            entities=["text"],
+            code='# Formats the text in textRanges to be bold, italic, have Times New Roman font, have a single underline, have font size 24, have the color teal and be Left aligned.\nformat_text(textRanges=textRanges, bold=true, fontName="Times New Roman", horizontalAlignment="Left", size=24, color="teal", italic=true, underline="Single")',
+        ),
+        DSLSyntaxExample(
+            entities=["text"],
+            code='# Many of the argument to format statements are optional. For example, this format statement makes the text bulleted and changes its color to olive.\nformat_text(textRanges=textRanges, bulleted=true, color="#808000")',
+        ),
     ]
+
 
 @pytest.fixture(scope="module")
 def dsl_rules_exampes():
     return [
-        DSLRuleExample(entities=["text"], rule="For select_text, if scope is provided it must be a either Presentation or a variable of type shapes or slides. If no scope is provided, we select the user slide selection."),
-        DSLRuleExample(entities=["text"], rule="You must select or insert an entity before formatting or deleting it."),
-        DSLRuleExample(entities=["text"], rule="Never use for loops, array indexing or if/else statements."),
+        DSLRuleExample(
+            entities=["text"],
+            rule="For select_text, if scope is provided it must be a either Presentation or a variable of type shapes or slides. If no scope is provided, we select the user slide selection.",
+        ),
+        DSLRuleExample(
+            entities=["text"],
+            rule="You must select or insert an entity before formatting or deleting it.",
+        ),
+        DSLRuleExample(
+            entities=["text"],
+            rule="Never use for loops, array indexing or if/else statements.",
+        ),
     ]
 
 
 @pytest.fixture(scope="module")
 def dsl_chat_exampes():
     return [
-        RetrieveExample(user_utterance="Change the text format to make it look like a typewriter", code='text = select_text()\nformat_text(textRanges=text, fontName="Courier New", size=18, bold=false, italic=false, underline="None", color="#000000", bulleted=false, horizontalAlignment="Left")', context=None, entities=["text"]),
-        RetrieveExample(user_utterance="Change the text format to make it look elegant", code='text = select_text()\nformat_text(textRanges=text, fontName="Times New Roman", size=18, italic=true)', context=None, entities=["text"]),
+        RetrieveExample(
+            user_utterance="Change the text format to make it look like a typewriter",
+            code='text = select_text()\nformat_text(textRanges=text, fontName="Courier New", size=18, bold=false, italic=false, underline="None", color="#000000", bulleted=false, horizontalAlignment="Left")',
+            context=None,
+            entities=["text"],
+        ),
+        RetrieveExample(
+            user_utterance="Change the text format to make it look elegant",
+            code='text = select_text()\nformat_text(textRanges=text, fontName="Times New Roman", size=18, italic=true)',
+            context=None,
+            entities=["text"],
+        ),
     ]
 
 
@@ -55,10 +87,13 @@ def analysis_examples():
         ),
     ]
 
+
 @pytest.fixture(scope="module")
-def executor(analysis_examples, dsl_chat_exampes, dsl_rules_exampes, dsl_syntax_exampes):
+def executor(
+    analysis_examples, dsl_chat_exampes, dsl_rules_exampes, dsl_syntax_exampes
+):
     key = os.getenv("OPENAI_API_KEY")
-    base = os.getenv("OPENAI_BASE")
+    base = os.getenv("OPENAI_API_BASE")
     entites = ["text", "image", "shape", "slide", "presentation"]
     context_rules = [
         "- Adding new text needs context to decide where to place the text on the current slide.",
@@ -72,20 +107,18 @@ def executor(analysis_examples, dsl_chat_exampes, dsl_rules_exampes, dsl_syntax_
         context_rules=context_rules,
         analysis_examples=analysis_examples,
         system_instruction="The DSL we are using is for performing actions in PowerPoint, please write DSL code to fulfill the given user utterance.",
-        dsl_examples_collection_name="test_dsl_examples",
+        collection_name_prefix="test",
         dsl_examples_k=5,
-        dsl_rules_collection_name="test_dsl_rules",
         dsl_rules_k=5,
-        dsl_syntax_collection_name="test_dsl_syntax",
         dsl_syntax_k=5,
     )
-    executor = NlcpsExecutor(config)
+    executor = nlcps_executor_factory(config)
 
     # Initialize empty vectorstore
     collections = [
-        executor.config.dsl_syntax_collection_name,
-        executor.config.dsl_rules_collection_name,
-        executor.config.dsl_examples_collection_name,
+        executor.retrieve_chain.dsl_rules_selector.collection_name,
+        executor.retrieve_chain.dsl_examples_selector.collection_name,
+        executor.retrieve_chain.dsl_syntax_selector.collection_name,
     ]
     for collection_name in collections:
         # Delete and create empty collections
@@ -102,13 +135,18 @@ def executor(analysis_examples, dsl_chat_exampes, dsl_rules_exampes, dsl_syntax_
 
 
 def test_executor(executor: NlcpsExecutor):
-    code = executor.program_synthesis(user_utterance="Make the title text on this slide red", context="")
-    print(f"code:\n{code}")
+    code = executor.program_synthesis(
+        user_utterance="Make the title text on this slide red", context=""
+    )
+    print(f"\ncode:\n{code}")
 
+    code = executor.program_synthesis(
+        user_utterance="Add text that’s a poem about the life of a high school student with emojis",
+        context="",
+    )
+    print(f"\ncode:\n{code}")
 
-    code = executor.program_synthesis(user_utterance="Add text that’s a poem about the life of a high school student with emojis", context="")
-    print(f"code:\n{code}")
-
-    code = executor.program_synthesis(user_utterance="Delete all the text on this slide.", context="")
-    print(f"code:\n{code}")
-
+    code = executor.program_synthesis(
+        user_utterance="Delete all the text on this slide.", context=""
+    )
+    print(f"\ncode:\n{code}")
