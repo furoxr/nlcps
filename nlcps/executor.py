@@ -5,7 +5,7 @@ from langchain.embeddings import OpenAIEmbeddings
 from pydantic.v1 import BaseSettings
 from qdrant_client.http.api_client import AsyncApis
 from qdrant_client.http.exceptions import UnexpectedResponse
-from qdrant_client.models import Distance, VectorParams
+from qdrant_client.models import Distance, VectorParams, CreateCollection
 
 from nlcps.analysis_chain import AnalysisChain, AnalysisResult
 from nlcps.model import initialize
@@ -65,9 +65,9 @@ class NlcpsExecutor:
             except UnexpectedResponse:
                 await self.qdrant_client.collections_api.create_collection(
                     collection_name,
-                    create_collection={
-                        "vectors": VectorParams(size=1536, distance=Distance.COSINE)
-                    },
+                    create_collection=CreateCollection(
+                        vectors=VectorParams(size=1536, distance=Distance.COSINE)
+                    ),
                 )
                 logger.info(f"Collection {collection_name} created.")
 

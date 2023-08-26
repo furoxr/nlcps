@@ -135,15 +135,11 @@ async def executor(
         ContextRuleExample.collection_name,
         AnalysisExample.collection_name,
     ]
+
+    # Delete and create empty collections
     for collection_name in collections:
-        # Delete and create empty collections
         await executor.qdrant_client.collections_api.delete_collection(collection_name)
-        await executor.qdrant_client.collections_api.create_collection(
-            collection_name,
-            create_collection=CreateCollection(
-                vectors=VectorParams(size=1536, distance=Distance.COSINE)
-            ),
-        )
+    await executor.init_vectorstore()
 
     # Add DSL syntax, rules, examples into vectorstore
     [await ContextRuleExample.save(e) for e in context_rules]
