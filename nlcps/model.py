@@ -124,8 +124,8 @@ class BaseQdrantModel(BaseModel):
 
         response = await _local.qdrant_client.points_api.scroll_points(
             collection_name=cls.collection_name,
-            scroll_request=ScrollRequest(limit=limit, with_payload=True, filter=filter),
+            scroll_request=ScrollRequest(limit=limit, with_payload=True, filter=filter, with_vector=False),
         )
 
-        objs = [cls(id=p.id, **p.payload) for p in response.result]  # type: ignore[union-attr, arg-type]
+        objs = [cls(id=p.id, **p.payload) for p in response.result.points]  # type: ignore[union-attr, arg-type]
         return objs

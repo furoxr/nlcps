@@ -1,4 +1,5 @@
 import os
+import asyncio
 
 import pytest
 from qdrant_client.models import Distance, VectorParams
@@ -6,6 +7,13 @@ from qdrant_client.models import Distance, VectorParams
 from nlcps.analysis_chain import AnalysisExample, AnalysisResult
 from nlcps.executor import NlcpsConfig, NlcpsExecutor, nlcps_executor_factory
 from nlcps.types import DSLRuleExample, DSLSyntaxExample, RetrieveExample
+
+@pytest.fixture(scope="module")
+def event_loop():
+    policy = asyncio.get_event_loop_policy()
+    loop = policy.new_event_loop()
+    yield loop
+    loop.close()
 
 
 @pytest.fixture(scope="module")
@@ -89,7 +97,7 @@ def analysis_examples():
 
 
 @pytest.fixture(scope="module")
-def executor(
+async def executor(
     analysis_examples, dsl_chat_exampes, dsl_rules_exampes, dsl_syntax_exampes
 ):
     key = os.getenv("OPENAI_API_KEY")
@@ -118,7 +126,8 @@ def executor(
     collections = [
         executor.retrieve_chain.dsl_rules_selector.collection_name,
         executor.retrieve_chain.dsl_examples_selector.collection_name,
-        executor.retrieve_chain.dsl_syntax_selector.collection_name,
+        DSLSyntaxExample.collection_name
+        # executor.retrieve_chain.dsl_syntax_selector.collection_name,
     ]
     for collection_name in collections:
         # Delete and create empty collections
@@ -127,26 +136,28 @@ def executor(
         )
 
     # Add DSL syntax, rules, examples into vectorstore
-    [executor.retrieve_chain.dsl_syntax_selector.add(e) for e in dsl_syntax_exampes]
+    # [executor.retrieve_chain.dsl_syntax_selector.add(e) for e in dsl_syntax_exampes]
+    i = [await DSLSyntaxExample.save(e) for e in dsl_syntax_exampes]
+    print(i)
     [executor.retrieve_chain.dsl_rules_selector.add(e) for e in dsl_rules_exampes]
     [executor.retrieve_chain.dsl_examples_selector.add(e) for e in dsl_chat_exampes]
 
     return executor
 
 
-def test_executor(executor: NlcpsExecutor):
-    code = executor.program_synthesis(
+async def test_executor(executor: NlcpsExecutor):
+    code = await executor.program_synthesis(
         user_utterance="Make the title text on this slide red", context=""
     )
     print(f"\ncode:\n{code}")
 
-    code = executor.program_synthesis(
+    code = await executor.program_synthesis(
         user_utterance="Add text that’s a poem about the life of a high school student with emojis",
         context="",
     )
     print(f"\ncode:\n{code}")
 
-    code = executor.program_synthesis(
+    code = await executor.program_synthesis(
         user_utterance="Delete all the text on this slide.", context=""
     )
     print(f"\ncode:\n{code}")

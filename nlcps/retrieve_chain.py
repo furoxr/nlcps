@@ -30,21 +30,19 @@ RETRIEVE_PROMPT = (
 class RetrieveChain(BaseModel):
     llm: ChatOpenAI
     system_instruction: str
-    dsl_syntax_selector: FilterExampleSelector[DSLSyntaxExample]
     dsl_rules_selector: FilterExampleSelector[DSLRuleExample]
     dsl_examples_selector: FilterExampleSelector[RetrieveExample]
 
     _prompt_template: ChatPromptTemplate = PrivateAttr()
     _chain: LLMChain = PrivateAttr()
 
-    def format_dsl_syntax(
+    async def format_dsl_syntax(
         self,
         entities: List[str],
     ):
         """Format all DSL syntax code examples of which entities is a subset of entities"""
-        key = f"{self.dsl_syntax_selector.qdrant.metadata_payload_key}.entities"
-        dsl_syntax_examples = self.dsl_syntax_selector.select(
-            Filter(must=[FieldCondition(key=key, match=MatchAny(any=entities))])
+        dsl_syntax_examples = await DSLSyntaxExample.scroll(
+            Filter(must=[FieldCondition(key='entities', match=MatchAny(any=entities))])
         )
         self._prompt_template = self._prompt_template.partial(
             dsl_syntax="\n".join(["- " + i.code for i in dsl_syntax_examples])
@@ -114,7 +112,7 @@ class RetrieveChain(BaseModel):
         )
         return few_shot_prompt
 
-    def init_chain(
+    async def init_chain(
         self, user_utterance: str, entities: List[str], context: Optional[str] = None
     ):
         """Format template with rules, syntax and examples"""
@@ -129,7 +127,7 @@ class RetrieveChain(BaseModel):
         self._prompt_template = self._prompt_template.partial(
             system_instruction=self.system_instruction
         )
-        self.format_dsl_syntax(entities)
+        await self.format_dsl_syntax(entities)
         self.format_dsl_rules(entities)
         if context:
             self._prompt_template = self._prompt_template.partial(
@@ -141,8 +139,8 @@ class RetrieveChain(BaseModel):
             prompt=self._prompt_template,
         )
 
-    def run(
+    async def run(
         self, user_utterance: str, entities: List[str], context: Optional[str] = None
     ) -> str:
-        self.init_chain(user_utterance, entities, context)
-        return self._chain.run(input=user_utterance, context=context)
+        await self.init_chain(user_utterance, entities, context)
+        return await self._chain.arun(input=user_utterance, context=context)

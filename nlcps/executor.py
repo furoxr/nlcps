@@ -6,15 +6,17 @@ from langchain.vectorstores import Qdrant
 from pydantic.v1 import BaseSettings
 from qdrant_client import QdrantClient
 from qdrant_client.http.exceptions import UnexpectedResponse
+from qdrant_client.http.api_client import AsyncApis
 from qdrant_client.models import Distance, VectorParams
 
 from nlcps.analysis_chain import AnalysisChain, AnalysisResult
+from nlcps.model import initialize
 from nlcps.retrieve_chain import RetrieveChain
 from nlcps.selector import (
-    FilterExampleSelector,
+    # FilterExampleSelector,
     dsl_examples_selector_factory,
     dsl_rules_selector_factory,
-    dsl_syntax_selector_factory,
+    # dsl_syntax_selector_factory,
 )
 from nlcps.types import (
     AnalysisExample,
@@ -83,7 +85,7 @@ class NlcpsExecutor:
         """Retrieve related samples from sample bank."""
         return self.retrieve_chain.retrieve_few_shot_examples(user_utterance, entities)
 
-    def program_synthesis(
+    async def program_synthesis(
         self,
         user_utterance: str,
         context: Optional[str] = None,
@@ -96,7 +98,7 @@ class NlcpsExecutor:
                 "User utterance requires context but no context is provided."
             )
 
-        return self.retrieve_chain.run(
+        return await self.retrieve_chain.run(
             user_utterance, analysis_result.entities, context
         )
 
@@ -111,15 +113,21 @@ def nlcps_executor_factory(config: NlcpsConfig) -> NlcpsExecutor:
         openai_api_base=config.openai_api_base,
     )
     qdrant_client = QdrantClient()
+    async_qdrant_client: AsyncApis = AsyncApis(host='http://127.0.0.1:6333')
+
 
     embeddings = OpenAIEmbeddings(  # type: ignore
         openai_api_key=config.openai_api_key,
         openai_api_base=config.openai_api_base,
     )
+    initialize(async_qdrant_client, embeddings)
+    DSLSyntaxExample.collection_name = dsl_syntax_collection_name
+    DSLSyntaxExample.embedding_key = 'code'
 
-    dsl_syntax_selector = dsl_syntax_selector_factory(
-        qdrant_client, dsl_syntax_collection_name, embeddings, config.dsl_syntax_k
-    )
+
+    # dsl_syntax_selector = dsl_syntax_selector_factory(
+    #     qdrant_client, dsl_syntax_collection_name, embeddings, config.dsl_syntax_k
+    # )
     dsl_rules_selector = dsl_rules_selector_factory(
         qdrant_client, dsl_rules_collection_name, embeddings, config.dsl_rules_k
     )
@@ -136,7 +144,7 @@ def nlcps_executor_factory(config: NlcpsConfig) -> NlcpsExecutor:
     retrieve_chain = RetrieveChain(
         llm=llm,
         system_instruction=config.system_instruction,
-        dsl_syntax_selector=dsl_syntax_selector,
+        # dsl_syntax_selector=dsl_syntax_selector,
         dsl_rules_selector=dsl_rules_selector,
         dsl_examples_selector=dsl_examples_selector,
     )

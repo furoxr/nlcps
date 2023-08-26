@@ -2,6 +2,8 @@ from typing import List, Optional
 
 from pydantic.v1 import BaseModel, Field, validator
 
+from nlcps.model import BaseQdrantModel
+
 
 class AnalysisResult(BaseModel):
     entities: List[str] = Field(description="Entities including in the user utterance")
@@ -35,7 +37,7 @@ class RetrieveExample(BaseIdModel):
     entities: List[str] = Field(description="Entities of the user utterance")
 
 
-class DSLSyntaxExample(BaseIdModel):
+class DSLSyntaxExample(BaseQdrantModel):
     entities: List[str]
     code: str
 
