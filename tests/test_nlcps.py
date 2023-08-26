@@ -2,7 +2,6 @@ import os
 import asyncio
 
 import pytest
-from qdrant_client.models import Distance, VectorParams, CreateCollection
 
 from nlcps.analysis_chain import AnalysisExample, AnalysisResult
 from nlcps.executor import NlcpsConfig, NlcpsExecutor, nlcps_executor_factory
