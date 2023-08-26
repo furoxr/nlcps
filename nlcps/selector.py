@@ -82,14 +82,3 @@ class FilterExampleSelector(BaseModel, Generic[T]):
         ]
 
         return examples
-
-
-def dsl_examples_selector_factory(
-    client: QdrantClient, collection_name: str, embeddings: Embeddings, k: int
-) -> FilterExampleSelector[RetrieveExample]:
-    return FilterExampleSelector(
-        qdrant=Qdrant(client, collection_name, embeddings),
-        model_cls=RetrieveExample,
-        k=k,
-        input_keys=["user_utterance"],
-    )

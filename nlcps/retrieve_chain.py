@@ -13,6 +13,7 @@ from pydantic.v1 import BaseModel, PrivateAttr
 from qdrant_client.models import FieldCondition, Filter, MatchAny, MatchValue
 
 from nlcps.selector import FilterExampleSelector
+from nlcps.model import _local
 from nlcps.types import (
     DSLRuleExample,
     DSLSyntaxExample,
@@ -30,7 +31,7 @@ RETRIEVE_PROMPT = (
 class RetrieveChain(BaseModel):
     llm: ChatOpenAI
     system_instruction: str
-    dsl_examples_selector: FilterExampleSelector[RetrieveExample]
+    examples_limit: int = 5
 
     _prompt_template: ChatPromptTemplate = PrivateAttr()
     _chain: LLMChain = PrivateAttr()
@@ -41,7 +42,7 @@ class RetrieveChain(BaseModel):
     ):
         """Format all DSL syntax code examples of which entities is a subset of entities"""
         dsl_syntax_examples = await DSLSyntaxExample.scroll(
-            Filter(must=[FieldCondition(key='entities', match=MatchAny(any=entities))])
+            Filter(must=[FieldCondition(key="entities", match=MatchAny(any=entities))])
         )
         self._prompt_template = self._prompt_template.partial(
             dsl_syntax="\n".join(["- " + i.code for i in dsl_syntax_examples])
@@ -53,41 +54,43 @@ class RetrieveChain(BaseModel):
     ):
         """Format all DSL rules related to entities"""
         dsl_rules_examples = await DSLRuleExample.scroll(
-            Filter(must=[FieldCondition(key='entities', match=MatchAny(any=entities))])
+            Filter(must=[FieldCondition(key="entities", match=MatchAny(any=entities))])
         )
         self._prompt_template = self._prompt_template.partial(
             dsl_rules="\n".join(["- " + i.rule for i in dsl_rules_examples])
         )
 
-    def retrieve_few_shot_examples(
+    async def retrieve_few_shot_examples(
         self, user_utterance: str, entities: List[str]
     ) -> List[tuple[RetrieveExample, float]]:
         """Retrieve related samples from sample bank."""
-        key = f"{self.dsl_examples_selector.qdrant.metadata_payload_key}.entities"
         condition = Filter(
             must=[
-                FieldCondition(key=key, match=MatchValue(value=entity))
+                FieldCondition(key="entities", match=MatchValue(value=entity))
                 for entity in entities
             ]
         )
-        similarity_examples = self.dsl_examples_selector.similarity_select(
-            {"user_utterance": user_utterance}, filter=condition
+        embedding = await _local.embedding.aembed_query(user_utterance)
+        similarity_examples = await RetrieveExample.search(
+            embedding, filter=condition, limit=self.examples_limit
         )
         similarity_examples.sort(key=lambda x: x[1])
         similarity_examples.reverse()
         return similarity_examples
 
-    def few_shot_exmaple_template(
+    async def few_shot_exmaple_template(
         self,
         user_utterance: str,
         entities: List[str],
     ) -> FewShotChatMessagePromptTemplate:
         """Format template leveraging examples"""
-        similarity_examples = self.retrieve_few_shot_examples(user_utterance, entities)
+        similarity_examples = await self.retrieve_few_shot_examples(user_utterance, entities)
         final_examples = []
 
         # Select max(k, length(entities)) samples, such that each associated entities is represented at least once
-        for index in range(min(max(self.dsl_examples_selector.k, len(entities)), len(similarity_examples))):
+        for index in range(
+            min(max(self.examples_limit, len(entities)), len(similarity_examples))
+        ):
             example = similarity_examples[index][0]
             final_examples.append(
                 {
@@ -114,7 +117,7 @@ class RetrieveChain(BaseModel):
         self, user_utterance: str, entities: List[str], context: Optional[str] = None
     ):
         """Format template with rules, syntax and examples"""
-        few_shot_prompt = self.few_shot_exmaple_template(user_utterance, entities)
+        few_shot_prompt = await self.few_shot_exmaple_template(user_utterance, entities)
         self._prompt_template = ChatPromptTemplate.from_messages(
             [
                 SystemMessagePromptTemplate.from_template(RETRIEVE_PROMPT),

@@ -12,9 +12,6 @@ from qdrant_client.models import Distance, VectorParams
 from nlcps.analysis_chain import AnalysisChain, AnalysisResult
 from nlcps.model import initialize
 from nlcps.retrieve_chain import RetrieveChain
-from nlcps.selector import (
-    dsl_examples_selector_factory,
-)
 from nlcps.types import (
     AnalysisExample,
     DSLRuleExample,
@@ -58,9 +55,9 @@ class NlcpsExecutor:
     def init_vectorstore(self):
         """Create collections if not exists."""
         collections = [
-            self.retrieve_chain.dsl_rules_selector.collection_name,
-            self.retrieve_chain.dsl_examples_selector.collection_name,
-            self.retrieve_chain.dsl_syntax_selector.collection_name,
+            RetrieveExample.collection_name,
+            DSLRuleExample.collection_name,
+            DSLSyntaxExample.collection_name,
         ]
         for collection_name in collections:
             try:
@@ -76,11 +73,13 @@ class NlcpsExecutor:
         """Analysis user utterance to get entities and whether context needed."""
         return self.analysis_chain.run(user_utterance)
 
-    def retrieve(
+    async def retrieve(
         self, user_utterance: str, entities: List[str]
     ) -> List[tuple[RetrieveExample, float]]:
         """Retrieve related samples from sample bank."""
-        return self.retrieve_chain.retrieve_few_shot_examples(user_utterance, entities)
+        return await self.retrieve_chain.retrieve_few_shot_examples(
+            user_utterance, entities
+        )
 
     async def program_synthesis(
         self,
@@ -110,8 +109,7 @@ def nlcps_executor_factory(config: NlcpsConfig) -> NlcpsExecutor:
         openai_api_base=config.openai_api_base,
     )
     qdrant_client = QdrantClient()
-    async_qdrant_client: AsyncApis = AsyncApis(host='http://127.0.0.1:6333')
-
+    async_qdrant_client: AsyncApis = AsyncApis(host="http://127.0.0.1:6333")
 
     embeddings = OpenAIEmbeddings(  # type: ignore
         openai_api_key=config.openai_api_key,
@@ -120,14 +118,13 @@ def nlcps_executor_factory(config: NlcpsConfig) -> NlcpsExecutor:
     initialize(async_qdrant_client, embeddings)
 
     DSLSyntaxExample.collection_name = dsl_syntax_collection_name
-    DSLSyntaxExample.embedding_key = 'code'
+    DSLSyntaxExample.embedding_key = "code"
 
     DSLRuleExample.collection_name = dsl_rules_collection_name
-    DSLRuleExample.embedding_key = 'rule'
+    DSLRuleExample.embedding_key = "rule"
 
-    dsl_examples_selector = dsl_examples_selector_factory(
-        qdrant_client, dsl_examples_collection_name, embeddings, config.dsl_examples_k
-    )
+    RetrieveExample.collection_name = dsl_examples_collection_name
+    RetrieveExample.embedding_key = "user_utterance"
 
     analysis_chain = AnalysisChain(
         llm=llm,
@@ -138,7 +135,6 @@ def nlcps_executor_factory(config: NlcpsConfig) -> NlcpsExecutor:
     retrieve_chain = RetrieveChain(
         llm=llm,
         system_instruction=config.system_instruction,
-        dsl_examples_selector=dsl_examples_selector,
     )
     return NlcpsExecutor(
         qdrant_client=qdrant_client,

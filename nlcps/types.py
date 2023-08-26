@@ -30,7 +30,7 @@ class BaseIdModel(BaseModel):
     id: Optional[str] = Field(description="Unique id of the point in qdrant")
 
 
-class RetrieveExample(BaseIdModel):
+class RetrieveExample(BaseQdrantModel):
     user_utterance: str = Field(description="User utterance")
     code: str = Field(description="Generated DSL code")
     context: Optional[str] = Field(description="Context of the example")
