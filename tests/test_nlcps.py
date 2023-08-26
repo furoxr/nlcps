@@ -124,10 +124,9 @@ async def executor(
 
     # Initialize empty vectorstore
     collections = [
-        executor.retrieve_chain.dsl_rules_selector.collection_name,
         executor.retrieve_chain.dsl_examples_selector.collection_name,
+        DSLRuleExample.collection_name,
         DSLSyntaxExample.collection_name
-        # executor.retrieve_chain.dsl_syntax_selector.collection_name,
     ]
     for collection_name in collections:
         # Delete and create empty collections
@@ -137,9 +136,8 @@ async def executor(
 
     # Add DSL syntax, rules, examples into vectorstore
     # [executor.retrieve_chain.dsl_syntax_selector.add(e) for e in dsl_syntax_exampes]
-    i = [await DSLSyntaxExample.save(e) for e in dsl_syntax_exampes]
-    print(i)
-    [executor.retrieve_chain.dsl_rules_selector.add(e) for e in dsl_rules_exampes]
+    [await DSLSyntaxExample.save(e) for e in dsl_syntax_exampes]
+    [await DSLRuleExample.save(e) for e in dsl_rules_exampes]
     [executor.retrieve_chain.dsl_examples_selector.add(e) for e in dsl_chat_exampes]
 
     return executor

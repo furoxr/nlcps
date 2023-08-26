@@ -13,10 +13,7 @@ from nlcps.analysis_chain import AnalysisChain, AnalysisResult
 from nlcps.model import initialize
 from nlcps.retrieve_chain import RetrieveChain
 from nlcps.selector import (
-    # FilterExampleSelector,
     dsl_examples_selector_factory,
-    dsl_rules_selector_factory,
-    # dsl_syntax_selector_factory,
 )
 from nlcps.types import (
     AnalysisExample,
@@ -121,16 +118,13 @@ def nlcps_executor_factory(config: NlcpsConfig) -> NlcpsExecutor:
         openai_api_base=config.openai_api_base,
     )
     initialize(async_qdrant_client, embeddings)
+
     DSLSyntaxExample.collection_name = dsl_syntax_collection_name
     DSLSyntaxExample.embedding_key = 'code'
 
+    DSLRuleExample.collection_name = dsl_rules_collection_name
+    DSLRuleExample.embedding_key = 'rule'
 
-    # dsl_syntax_selector = dsl_syntax_selector_factory(
-    #     qdrant_client, dsl_syntax_collection_name, embeddings, config.dsl_syntax_k
-    # )
-    dsl_rules_selector = dsl_rules_selector_factory(
-        qdrant_client, dsl_rules_collection_name, embeddings, config.dsl_rules_k
-    )
     dsl_examples_selector = dsl_examples_selector_factory(
         qdrant_client, dsl_examples_collection_name, embeddings, config.dsl_examples_k
     )
@@ -144,8 +138,6 @@ def nlcps_executor_factory(config: NlcpsConfig) -> NlcpsExecutor:
     retrieve_chain = RetrieveChain(
         llm=llm,
         system_instruction=config.system_instruction,
-        # dsl_syntax_selector=dsl_syntax_selector,
-        dsl_rules_selector=dsl_rules_selector,
         dsl_examples_selector=dsl_examples_selector,
     )
     return NlcpsExecutor(

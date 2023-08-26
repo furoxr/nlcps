@@ -84,28 +84,6 @@ class FilterExampleSelector(BaseModel, Generic[T]):
         return examples
 
 
-def dsl_syntax_selector_factory(
-    client: QdrantClient, collection_name: str, embeddings: Embeddings, k: int
-) -> FilterExampleSelector[DSLSyntaxExample]:
-    return FilterExampleSelector(
-        qdrant=Qdrant(client, collection_name, embeddings),
-        model_cls=DSLSyntaxExample,
-        k=k,
-        input_keys=["code"],
-    )
-
-
-def dsl_rules_selector_factory(
-    client: QdrantClient, collection_name: str, embeddings: Embeddings, k: int
-) -> FilterExampleSelector[DSLRuleExample]:
-    return FilterExampleSelector(
-        qdrant=Qdrant(client, collection_name, embeddings),
-        model_cls=DSLRuleExample,
-        k=k,
-        input_keys=["rule"],
-    )
-
-
 def dsl_examples_selector_factory(
     client: QdrantClient, collection_name: str, embeddings: Embeddings, k: int
 ) -> FilterExampleSelector[RetrieveExample]:

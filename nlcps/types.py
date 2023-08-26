@@ -42,6 +42,6 @@ class DSLSyntaxExample(BaseQdrantModel):
     code: str
 
 
-class DSLRuleExample(BaseIdModel):
+class DSLRuleExample(BaseQdrantModel):
     entities: List[str]
     rule: str

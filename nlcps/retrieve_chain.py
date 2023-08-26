@@ -30,7 +30,6 @@ RETRIEVE_PROMPT = (
 class RetrieveChain(BaseModel):
     llm: ChatOpenAI
     system_instruction: str
-    dsl_rules_selector: FilterExampleSelector[DSLRuleExample]
     dsl_examples_selector: FilterExampleSelector[RetrieveExample]
 
     _prompt_template: ChatPromptTemplate = PrivateAttr()
@@ -48,14 +47,13 @@ class RetrieveChain(BaseModel):
             dsl_syntax="\n".join(["- " + i.code for i in dsl_syntax_examples])
         )
 
-    def format_dsl_rules(
+    async def format_dsl_rules(
         self,
         entities: List[str],
     ):
         """Format all DSL rules related to entities"""
-        key = f"{self.dsl_rules_selector.qdrant.metadata_payload_key}.entities"
-        dsl_rules_examples = self.dsl_rules_selector.select(
-            Filter(must=[FieldCondition(key=key, match=MatchAny(any=entities))])
+        dsl_rules_examples = await DSLRuleExample.scroll(
+            Filter(must=[FieldCondition(key='entities', match=MatchAny(any=entities))])
         )
         self._prompt_template = self._prompt_template.partial(
             dsl_rules="\n".join(["- " + i.rule for i in dsl_rules_examples])
@@ -128,7 +126,7 @@ class RetrieveChain(BaseModel):
             system_instruction=self.system_instruction
         )
         await self.format_dsl_syntax(entities)
-        self.format_dsl_rules(entities)
+        await self.format_dsl_rules(entities)
         if context:
             self._prompt_template = self._prompt_template.partial(
                 context=f"Context is:\n{context}"
