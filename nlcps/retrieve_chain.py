@@ -12,13 +12,8 @@ from langchain.prompts import (
 from pydantic.v1 import BaseModel, PrivateAttr
 from qdrant_client.models import FieldCondition, Filter, MatchAny, MatchValue
 
-from nlcps.selector import FilterExampleSelector
 from nlcps.model import _local
-from nlcps.types import (
-    DSLRuleExample,
-    DSLSyntaxExample,
-    RetrieveExample,
-)
+from nlcps.types import DSLRuleExample, DSLSyntaxExample, RetrieveExample
 
 RETRIEVE_PROMPT = (
     "{system_instruction}\n"
@@ -84,7 +79,9 @@ class RetrieveChain(BaseModel):
         entities: List[str],
     ) -> FewShotChatMessagePromptTemplate:
         """Format template leveraging examples"""
-        similarity_examples = await self.retrieve_few_shot_examples(user_utterance, entities)
+        similarity_examples = await self.retrieve_few_shot_examples(
+            user_utterance, entities
+        )
         final_examples = []
 
         # Select max(k, length(entities)) samples, such that each associated entities is represented at least once

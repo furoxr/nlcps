@@ -10,8 +10,8 @@ from qdrant_client.models import (
     Filter,
     PointsList,
     PointStruct,
-    SearchRequest,
     ScrollRequest,
+    SearchRequest,
 )
 
 from nlcps.exceptions import VectorStoreNotInitialized
@@ -72,6 +72,7 @@ class BaseQdrantModel(BaseModel):
         filter: Optional[Filter] = None,
         limit: int = 5,
     ) -> List[tuple[T, float]]:
+        """Search for similar points in the vectorstore."""
         assert (
             cls.collection_name and cls.embedding_key
         ), f"Collection name and embedding key must be set for {cls}"
@@ -91,6 +92,7 @@ class BaseQdrantModel(BaseModel):
 
     @classmethod
     async def save(cls, instance: T) -> str:
+        """Persist the instance into the vectorstore."""
         assert (
             cls.collection_name and cls.embedding_key
         ), f"Collection name and embedding key must be set for {cls}"
@@ -117,14 +119,19 @@ class BaseQdrantModel(BaseModel):
         return point_id
 
     @classmethod
-    async def scroll(cls: type[T], filter: Filter, limit: int = 5) -> List[T]:
+    async def scroll(
+        cls: type[T], filter: Optional[Filter] = None, limit: int = 5
+    ) -> List[T]:
+        """Scroll through all points which matches given filtering condition."""
         assert (
             cls.collection_name and cls.embedding_key
         ), f"Collection name and embedding key must be set for {cls}"
 
         response = await _local.qdrant_client.points_api.scroll_points(
             collection_name=cls.collection_name,
-            scroll_request=ScrollRequest(limit=limit, with_payload=True, filter=filter, with_vector=False),
+            scroll_request=ScrollRequest(
+                limit=limit, with_payload=True, filter=filter, with_vector=False
+            ),
         )
 
         objs = [cls(id=p.id, **p.payload) for p in response.result.points]  # type: ignore[union-attr, arg-type]

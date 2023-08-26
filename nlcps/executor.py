@@ -2,11 +2,9 @@ from typing import List, Optional
 
 from langchain.chat_models import ChatOpenAI
 from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import Qdrant
 from pydantic.v1 import BaseSettings
-from qdrant_client import QdrantClient
-from qdrant_client.http.exceptions import UnexpectedResponse
 from qdrant_client.http.api_client import AsyncApis
+from qdrant_client.http.exceptions import UnexpectedResponse
 from qdrant_client.models import Distance, VectorParams
 
 from nlcps.analysis_chain import AnalysisChain, AnalysisResult
@@ -14,6 +12,7 @@ from nlcps.model import initialize
 from nlcps.retrieve_chain import RetrieveChain
 from nlcps.types import (
     AnalysisExample,
+    ContextRuleExample,
     DSLRuleExample,
     DSLSyntaxExample,
     RetrieveExample,
@@ -26,8 +25,6 @@ class NlcpsConfig(BaseSettings):
     openai_api_base: str = "https://api.openai.com/v1"
 
     entities: List[str]
-    context_rules: List[str]
-    analysis_examples: List[AnalysisExample]
     system_instruction: str
 
     collection_name_prefix: str
@@ -44,7 +41,7 @@ class NlcpsConfig(BaseSettings):
 class NlcpsExecutor:
     def __init__(
         self,
-        qdrant_client: QdrantClient,
+        qdrant_client: AsyncApis,
         analysis_chain: AnalysisChain,
         retrieve_chain: RetrieveChain,
     ):
@@ -52,26 +49,31 @@ class NlcpsExecutor:
         self.analysis_chain = analysis_chain
         self.retrieve_chain = retrieve_chain
 
-    def init_vectorstore(self):
+    async def init_vectorstore(self):
         """Create collections if not exists."""
         collections = [
             RetrieveExample.collection_name,
             DSLRuleExample.collection_name,
             DSLSyntaxExample.collection_name,
+            ContextRuleExample.collection_name,
+            AnalysisExample.collection_name,
         ]
         for collection_name in collections:
             try:
-                self.qdrant_client.get_collection(collection_name)
+                await self.qdrant_client.collections_api.get_collection(collection_name)
                 logger.info(f"Collection '{collection_name}' already exists")
             except UnexpectedResponse:
-                self.qdrant_client.create_collection(
-                    collection_name, VectorParams(size=1536, distance=Distance.COSINE)
+                await self.qdrant_client.collections_api.create_collection(
+                    collection_name,
+                    create_collection={
+                        "vectors": VectorParams(size=1536, distance=Distance.COSINE)
+                    },
                 )
                 logger.info(f"Collection {collection_name} created.")
 
-    def analysis(self, user_utterance: str) -> AnalysisResult:
+    async def analysis(self, user_utterance: str) -> AnalysisResult:
         """Analysis user utterance to get entities and whether context needed."""
-        return self.analysis_chain.run(user_utterance)
+        return await self.analysis_chain.run(user_utterance)
 
     async def retrieve(
         self, user_utterance: str, entities: List[str]
@@ -87,7 +89,7 @@ class NlcpsExecutor:
         context: Optional[str] = None,
     ) -> str:
         """Generate DSL program to fulfill user utterance."""
-        analysis_result = self.analysis_chain.run(user_utterance)
+        analysis_result = await self.analysis_chain.run(user_utterance)
         logger.debug(f"{analysis_result}")
         if analysis_result.need_context and context is None:
             raise ValueError(
@@ -100,44 +102,51 @@ class NlcpsExecutor:
 
 
 def nlcps_executor_factory(config: NlcpsConfig) -> NlcpsExecutor:
-    dsl_syntax_collection_name = f"{config.collection_name_prefix}_dsl_syntax"
-    dsl_rules_collection_name = f"{config.collection_name_prefix}_dsl_rules"
-    dsl_examples_collection_name = f"{config.collection_name_prefix}_dsl_examples"
+    """Initialize NLCPS executor."""
 
+    init_models(config.collection_name_prefix)
+
+    # Initialize qdrant client, llm client and embedding client
+    async_qdrant_client: AsyncApis = AsyncApis(host="http://127.0.0.1:6333")
     llm = ChatOpenAI(
         openai_api_key=config.openai_api_key,
         openai_api_base=config.openai_api_base,
     )
-    qdrant_client = QdrantClient()
-    async_qdrant_client: AsyncApis = AsyncApis(host="http://127.0.0.1:6333")
-
     embeddings = OpenAIEmbeddings(  # type: ignore
         openai_api_key=config.openai_api_key,
         openai_api_base=config.openai_api_base,
     )
     initialize(async_qdrant_client, embeddings)
 
-    DSLSyntaxExample.collection_name = dsl_syntax_collection_name
-    DSLSyntaxExample.embedding_key = "code"
-
-    DSLRuleExample.collection_name = dsl_rules_collection_name
-    DSLRuleExample.embedding_key = "rule"
-
-    RetrieveExample.collection_name = dsl_examples_collection_name
-    RetrieveExample.embedding_key = "user_utterance"
-
+    # Initialize executor
     analysis_chain = AnalysisChain(
         llm=llm,
         entities=config.entities,
-        context_rules=config.context_rules,
-        examples=config.analysis_examples,
     )
     retrieve_chain = RetrieveChain(
         llm=llm,
         system_instruction=config.system_instruction,
     )
     return NlcpsExecutor(
-        qdrant_client=qdrant_client,
+        qdrant_client=async_qdrant_client,
         analysis_chain=analysis_chain,
         retrieve_chain=retrieve_chain,
     )
+
+
+def init_models(prefix: str):
+    """Initialize collection name and embedding key of models."""
+    DSLSyntaxExample.collection_name = f"{prefix}_dsl_syntax"
+    DSLSyntaxExample.embedding_key = "code"
+
+    DSLRuleExample.collection_name = f"{prefix}_dsl_rules"
+    DSLRuleExample.embedding_key = "rule"
+
+    RetrieveExample.collection_name = f"{prefix}_dsl_examples"
+    RetrieveExample.embedding_key = "user_utterance"
+
+    ContextRuleExample.collection_name = f"{prefix}_context_rules"
+    ContextRuleExample.embedding_key = "rule"
+
+    AnalysisExample.collection_name = f"{prefix}_analysis_examples"
+    AnalysisExample.embedding_key = "utterance"

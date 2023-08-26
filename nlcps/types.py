@@ -21,13 +21,13 @@ class AnalysisResult(BaseModel):
         return v
 
 
-class AnalysisExample(BaseModel):
+class AnalysisExample(BaseQdrantModel):
     utterance: str = Field(description="User utterance")
     analysis_result: AnalysisResult = Field(description="Analysis result")
 
 
-class BaseIdModel(BaseModel):
-    id: Optional[str] = Field(description="Unique id of the point in qdrant")
+class ContextRuleExample(BaseQdrantModel):
+    rule: str = Field(description="Context rule")
 
 
 class RetrieveExample(BaseQdrantModel):

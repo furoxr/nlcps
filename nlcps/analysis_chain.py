@@ -12,7 +12,7 @@ from langchain.prompts import (
 )
 from pydantic.v1 import BaseModel, PrivateAttr
 
-from nlcps.types import AnalysisExample, AnalysisResult
+from nlcps.types import AnalysisExample, AnalysisResult, ContextRuleExample
 
 ANALYSIS_PROMPT = (
     "There are {entities_len} entities in the utterance: {entities}."
@@ -30,13 +30,11 @@ ANALYSIS_PROMPT = (
 class AnalysisChain(BaseModel):
     llm: ChatOpenAI
     entities: List[str]
-    context_rules: List[str]
-    examples: List[AnalysisExample]
 
     _prompt_template: ChatPromptTemplate = PrivateAttr()
     _chain: LLMChain = PrivateAttr()
 
-    def init_chain(self) -> None:
+    async def init_chain(self) -> None:
         """Initialize an analysis chain."""
         example_prompt = ChatPromptTemplate.from_messages(
             [
@@ -45,7 +43,7 @@ class AnalysisChain(BaseModel):
             ]
         )
         few_shot_prompt = FewShotChatMessagePromptTemplate(
-            example_prompt=example_prompt, examples=self.format_examples(self.examples)
+            example_prompt=example_prompt, examples=await self.format_examples()
         )
         final_prompt = ChatPromptTemplate.from_messages(
             [
@@ -55,10 +53,12 @@ class AnalysisChain(BaseModel):
             ]
         )
         parser = PydanticOutputParser(pydantic_object=AnalysisResult)
+
+        context_rules = await ContextRuleExample.scroll(None)
         self._prompt_template = final_prompt.partial(
             entities_len=len(self.entities),  # type: ignore
             entities=",".join(self.entities),
-            context_rules="\n".join(self.context_rules),
+            context_rules="\n".join([i.rule for i in context_rules]),
             format_instructions=parser.get_format_instructions(),
         )
 
@@ -68,13 +68,14 @@ class AnalysisChain(BaseModel):
             output_parser=parser,
         )
 
-    def format_examples(self, examples: List[AnalysisExample]) -> List[Dict[str, str]]:
+    async def format_examples(self) -> List[Dict[str, str]]:
         """Handle the format of examples"""
+        examples = await AnalysisExample.scroll(None)
         return [
             {"input": e.utterance, "output": e.analysis_result.json()}  # type: ignore
             for e in examples
         ]
 
-    def run(self, user_utterance: str) -> AnalysisResult:
-        self.init_chain()
+    async def run(self, user_utterance: str) -> AnalysisResult:
+        await self.init_chain()
         return self._chain.run(user_utterance)

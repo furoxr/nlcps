@@ -2,11 +2,17 @@ import os
 import asyncio
 
 import pytest
-from qdrant_client.models import Distance, VectorParams
+from qdrant_client.models import Distance, VectorParams, CreateCollection
 
 from nlcps.analysis_chain import AnalysisExample, AnalysisResult
 from nlcps.executor import NlcpsConfig, NlcpsExecutor, nlcps_executor_factory
-from nlcps.types import DSLRuleExample, DSLSyntaxExample, RetrieveExample
+from nlcps.types import (
+    ContextRuleExample,
+    DSLRuleExample,
+    DSLSyntaxExample,
+    RetrieveExample,
+)
+
 
 @pytest.fixture(scope="module")
 def event_loop():
@@ -107,13 +113,12 @@ async def executor(
         "- Adding new text needs context to decide where to place the text on the current slide.",
         "- Adding an image about a given topic does not require context.",
     ]
+    context_rules = [ContextRuleExample(rule=r) for r in context_rules]
 
     config = NlcpsConfig(
         openai_api_key=key,
         openai_api_base=base,
         entities=entites,
-        context_rules=context_rules,
-        analysis_examples=analysis_examples,
         system_instruction="The DSL we are using is for performing actions in PowerPoint, please write DSL code to fulfill the given user utterance.",
         collection_name_prefix="test",
         dsl_examples_k=5,
@@ -126,16 +131,23 @@ async def executor(
     collections = [
         RetrieveExample.collection_name,
         DSLRuleExample.collection_name,
-        DSLSyntaxExample.collection_name
+        DSLSyntaxExample.collection_name,
+        ContextRuleExample.collection_name,
+        AnalysisExample.collection_name,
     ]
     for collection_name in collections:
         # Delete and create empty collections
-        executor.qdrant_client.recreate_collection(
-            collection_name, VectorParams(size=1536, distance=Distance.COSINE)
+        await executor.qdrant_client.collections_api.delete_collection(collection_name)
+        await executor.qdrant_client.collections_api.create_collection(
+            collection_name,
+            create_collection=CreateCollection(
+                vectors=VectorParams(size=1536, distance=Distance.COSINE)
+            ),
         )
 
     # Add DSL syntax, rules, examples into vectorstore
-    # [executor.retrieve_chain.dsl_syntax_selector.add(e) for e in dsl_syntax_exampes]
+    [await ContextRuleExample.save(e) for e in context_rules]
+    [await AnalysisExample.save(e) for e in analysis_examples]
     [await DSLSyntaxExample.save(e) for e in dsl_syntax_exampes]
     [await DSLRuleExample.save(e) for e in dsl_rules_exampes]
     [await RetrieveExample.save(e) for e in dsl_chat_exampes]
